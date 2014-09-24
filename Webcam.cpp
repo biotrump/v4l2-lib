@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
+//to fix error: ‘close’ was not declared in this scope
+#include <unistd.h>
 
 #include <sys/poll.h>
 #include <sys/types.h>
