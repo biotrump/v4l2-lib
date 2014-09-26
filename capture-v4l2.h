@@ -1,5 +1,5 @@
-#ifndef _H_CAPTURE-V4L2_H
-#define _H_CAPTURE-V4L2_H
+#ifndef _H_CAPTURE_V4L2_H
+#define _H_CAPTURE_V4L2_H
 /*
 	<thomas tsai>thomas@biotrump.com
 */

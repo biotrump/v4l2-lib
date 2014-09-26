@@ -5,7 +5,7 @@ PROJECT( v4l2-lib )
 #my mozilla PC for openCV build
 #set(OpenCV_DIR "/home/thomas/build/misc/opencv/build")
 #my acer s3 ubuntu
-set(OpenCV_DIR "/home/thomas/build/openCV/2.4.9.x-static")
+set(OpenCV_DIR "/home/thomas/build/biotrump-cv/out/openCV/2.4.9.x-static")
 FIND_PACKAGE( OpenCV REQUIRED)
 
 #openMP to avoid link error : omp_xxx error!
