@@ -23,12 +23,31 @@ uint8_t *buffer;
 //http://linuxtv.org/downloads/v4l-dvb-apis/extended-controls.html
 static int xioctl(int fd, int request, void *arg)
 {
-        int r;
+    int r;
 
-        do r = ioctl (fd, request, arg);
-        while (-1 == r && EINTR == errno);
+    do r = ioctl (fd, request, arg);
+    while (-1 == r && EINTR == errno);
 
-        return r;
+    return r;
+}
+
+int QueryCap(int fd, struct v4l2_capability *pcaps)
+{
+    struct v4l2_capability caps = {0};
+    if (-1 == xioctl(fd, VIDIOC_QUERYCAP, pcaps)){
+        perror("Querying Capabilities");
+        return 1;
+    }
+    return 0;
+}
+
+int QueryCropCap(int fd, struct v4l2_cropcap *pcropcap)
+{
+    pcropcap->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (-1 == xioctl (fd, VIDIOC_CROPCAP, pcropcap)) {
+        perror("Querying Cropping Capabilities");
+        return 1;
+    }
 }
 
 int GetAutoWhiteBalance(int fd)
@@ -38,7 +57,7 @@ int GetAutoWhiteBalance(int fd)
 	if (-1 == xioctl(fd, VIDIOC_G_CTRL, &ctrl)){
 		perror("getting V4L2_CID_AUTO_WHITE_BALANCE");
 	}
-	printf("V4L2_CID_AUTO_WHITE_BALANCE = 0x%x\n",ctrl.value );
+//	printf("V4L2_CID_AUTO_WHITE_BALANCE = 0x%x\n",ctrl.value );
 	return ctrl.value;
 }
 
@@ -50,7 +69,7 @@ int SetAutoWhiteBalance(int fd, int enable)
 	if (-1 == xioctl(fd, VIDIOC_S_CTRL, &ctrl)){
 		perror("setting V4L2_CID_AUTO_WHITE_BALANCE");
 	}
-	printf("V4L2_CID_AUTO_WHITE_BALANCE = (0x%x -> 0x%x)\n",enable, GetAutoWhiteBalance(fd) );
+//	printf("V4L2_CID_AUTO_WHITE_BALANCE = (0x%x -> 0x%x)\n",enable, GetAutoWhiteBalance(fd) );
 	return GetAutoWhiteBalance(fd) == enable;
 }
 
@@ -377,7 +396,7 @@ int SetManualExposureExt(int fd, int value)
 }
 #endif
 
-int getVideoFMT(int fd)
+int EnumVideoFMT(int fd)
 {
 	int support_grbg10 = 0;
 	struct v4l2_fmtdesc fmtdesc = {0};
@@ -397,27 +416,55 @@ int getVideoFMT(int fd)
     }
 }
 
-int setVideoFMT(int fd, __u32 pixelformat)
+int GetVideoFMT(int fd, struct v4l2_format *pfmt)
 {
-	int i;
-    struct v4l2_format fmt = {0};
+    int i;
+//    struct v4l2_format fmt = {0};
     char fourcc[5] = {0};
+    pfmt->type = V4L2_BUF_TYPE_VIDEO_CAPTURE; //V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+	for(i = 0; i < 20; i ++){
+		if (-1 == xioctl(fd, VIDIOC_G_FMT, pfmt))
+		{
+		    perror("getting Pixel Format");
+			usleep(5000);
+			continue;
+		}else{
+		strncpy(fourcc, (char *)&pfmt->fmt.pix.pixelformat, 4);
+		printf( "Gotten Camera Mode:\n"
+		    "  Width: %d\n"
+		    "  Height: %d\n"
+		    "  PixFmt: %s\n"
+		    "  Field: %d\n"
+		    "  priv: 0x%x\n",
+		    pfmt->fmt.pix.width,
+		    pfmt->fmt.pix.height,
+		    fourcc,
+		    pfmt->fmt.pix.field,
+		    pfmt->fmt.pix.priv);
+		    break;
+		}
+	}
+}
 
+int SetVideoFMT(int fd, struct v4l2_format fmt)
+{
+    int i;
+//    struct v4l2_format fmt = {0};
+    char fourcc[5] = {0};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = 640;
-    fmt.fmt.pix.height = 480;
+//    fmt.fmt.pix.width = 640;
+//    fmt.fmt.pix.height = 480;
     //fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
     //fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_GREY;
 //    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-    fmt.fmt.pix.pixelformat = pixelformat;//V4L2_PIX_FMT_YUYV;
-    fmt.fmt.pix.field = V4L2_FIELD_NONE;
-
-	for(i = 0; i < 20; i ++){
+//    fmt.fmt.pix.pixelformat = pixelformat;//V4L2_PIX_FMT_YUYV;
+//    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+//	for(i = 0; i < 20; i ++){
 		if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
 		{
 		    perror("Setting Pixel Format");
-			usleep(5000);
-			continue;
+			//usleep(10000);
+			//continue;
 		}else{
 		strncpy(fourcc, (char *)&fmt.fmt.pix.pixelformat, 4);
 		printf( "Selected Camera Mode:\n"
@@ -429,100 +476,52 @@ int setVideoFMT(int fd, __u32 pixelformat)
 		    fmt.fmt.pix.height,
 		    fourcc,
 		    fmt.fmt.pix.field);
-		    break;
+		    //break;
 		}
-	}
+	//}
+	return 0;
 }
 
 int print_caps(int fd)
 {
-        struct v4l2_capability caps = {};
-        if (-1 == xioctl(fd, VIDIOC_QUERYCAP, &caps))
-        {
-                perror("Querying Capabilities");
-                return 1;
-        }
+    struct v4l2_capability caps = {0};
+    struct v4l2_cropcap cropcap = {0};
 
-        printf( "Driver Caps:\n"
-                "  Driver: \"%s\"\n"
-                "  Card: \"%s\"\n"
-                "  Bus: \"%s\"\n"
-                "  Version: %d.%d\n"
-                "  Capabilities: %08x\n",
-                caps.driver,
-                caps.card,                caps.bus_info,
-                (caps.version>>16)&&0xff,
-                (caps.version>>24)&&0xff,
-                caps.capabilities);
+    if (!QueryCap(fd, &caps)){
+	    printf( "Driver Caps:\n"
+            "  Driver: \"%s\"\n"
+            "  Card: \"%s\"\n"
+            "  Bus: \"%s\"\n"
+            "  Version: %d.%d\n"
+            "  Capabilities: %08x\n",
+            caps.driver,
+            caps.card,                caps.bus_info,
+            (caps.version>>16)&&0xff,
+            (caps.version>>24)&&0xff,
+            caps.capabilities);
+	}
 
+    if (!QueryCropCap(fd, &cropcap)){
+    	printf( "Camera Cropping:\n"
+        "  Bounds: %dx%d+%d+%d\n"
+        "  Default: %dx%d+%d+%d\n"
+        "  Aspect: %d/%d\n",
+        cropcap.bounds.width, cropcap.bounds.height, cropcap.bounds.left, cropcap.bounds.top,
+        cropcap.defrect.width, cropcap.defrect.height, cropcap.defrect.left, cropcap.defrect.top,
+        cropcap.pixelaspect.numerator, cropcap.pixelaspect.denominator);
+	}
+    EnumVideoFMT(fd); 
+    //int support_grbg10 = 0;
+    /*
+    if (!support_grbg10)
+    {
+        printf("Doesn't support GRBG10.\n");
+        return 1;
+    }*/
 
-        struct v4l2_cropcap cropcap = {0};
-        cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == xioctl (fd, VIDIOC_CROPCAP, &cropcap))
-        {
-                perror("Querying Cropping Capabilities");
-                return 1;
-        }
-
-        printf( "Camera Cropping:\n"
-                "  Bounds: %dx%d+%d+%d\n"
-                "  Default: %dx%d+%d+%d\n"
-                "  Aspect: %d/%d\n",
-                cropcap.bounds.width, cropcap.bounds.height, cropcap.bounds.left, cropcap.bounds.top,
-                cropcap.defrect.width, cropcap.defrect.height, cropcap.defrect.left, cropcap.defrect.top,
-                cropcap.pixelaspect.numerator, cropcap.pixelaspect.denominator);
-
-        int support_grbg10 = 0;
-
-        struct v4l2_fmtdesc fmtdesc = {0};
-        fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        char fourcc[5] = {0};
-        char c, e;
-        printf("\n  FMT : CE Desc\n--------------------\n");
-        while (0 == xioctl(fd, VIDIOC_ENUM_FMT, &fmtdesc))
-        {
-                strncpy(fourcc, (char *)&fmtdesc.pixelformat, 4);
-                if (fmtdesc.pixelformat == V4L2_PIX_FMT_SGRBG10)
-                    support_grbg10 = 1;
-                c = fmtdesc.flags & 1? 'C' : ' ';
-                e = fmtdesc.flags & 2? 'E' : ' ';
-                printf("  %s: %c%c, %s\n", fourcc, c, e, fmtdesc.description);
-                fmtdesc.index++;
-        }
-        /*
-        if (!support_grbg10)
-        {
-            printf("Doesn't support GRBG10.\n");
-            return 1;
-        }*/
-        struct v4l2_format fmt = {0};
-        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        fmt.fmt.pix.width = 640;
-        fmt.fmt.pix.height = 480;
-        //fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
-        //fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_GREY;
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-        fmt.fmt.pix.field = V4L2_FIELD_NONE;
-
-        if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
-        {
-            perror("Setting Pixel Format");
-            //return 1;
-        }else{
-        strncpy(fourcc, (char *)&fmt.fmt.pix.pixelformat, 4);
-        printf( "Selected Camera Mode:\n"
-                "  Width: %d\n"
-                "  Height: %d\n"
-                "  PixFmt: %s\n"
-                "  Field: %d\n",
-                fmt.fmt.pix.width,
-                fmt.fmt.pix.height,
-                fourcc,
-                fmt.fmt.pix.field);
-		}
 	GetAutoWhiteBalance(fd);
 
-        return 0;
+    return 0;
 }
 
 
