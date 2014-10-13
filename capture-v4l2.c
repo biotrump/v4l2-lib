@@ -150,7 +150,7 @@ static void autoExposureType(int type)
 }
 
 /*
-V4L2_EXPOSURE_MANUAL and V4L2_EXPOSURE_APERTURE_PRIORITY are commonly used. 
+V4L2_EXPOSURE_MANUAL and V4L2_EXPOSURE_APERTURE_PRIORITY are commonly used.
 */
 int SetAutoExposure(int fd, int type)
 {
@@ -220,7 +220,7 @@ int SetManualExposure(int fd, int val)
 	ctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
    	ctrl.value = val;
    	if (-1 == xioctl(fd,VIDIOC_S_CTRL,&ctrl)) {
-      perror("setting V4L2_EXPOSURE_MANUAL");
+      perror("setting V4L2_CID_EXPOSURE_ABSOLUTE");
       return -1;
 	}
 	return val;
@@ -482,6 +482,174 @@ int SetVideoFMT(int fd, struct v4l2_format fmt)
 	return 0;
 }
 
+/*
+void Webcam::GetParam(v4l2_streamparm &param) {
+	param.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	int ret = ioctl(m_fd, VIDIOC_G_PARM, &param);
+
+	if (ret == -1) {
+		throw std::runtime_error("unable to fetch device parameters");
+	}
+}
+
+void Webcam::SetParam(v4l2_streamparm &param) {
+	int ret = ioctl(m_fd, VIDIOC_S_PARM, &param);
+
+	if (ret == -1) {
+		throw std::runtime_error("unable to change device parameters");
+	}
+}
+
+double Webcam::GetFPS(void) const {
+	// TODO: Verify that denom is not zero.
+	double numer = m_param.parm.capture.timeperframe.numerator;
+	double denom = m_param.parm.capture.timeperframe.denominator;
+	return denom / numer;
+}
+
+void Webcam::SetFPS(uint32_t fps) {
+	m_param.parm.capture.timeperframe.numerator   = 1;
+	m_param.parm.capture.timeperframe.denominator = fps;
+	SetParam(m_param);
+
+	uint32_t fps_new = m_param.parm.capture.timeperframe.denominator
+	                 / m_param.parm.capture.timeperframe.numerator;
+	if (fps != fps_new) {
+		throw std::invalid_argument("unsupported frame rate");
+	}
+}
+*/
+
+void SetFPSParam(int fd, uint32_t fps) 
+{
+	struct v4l2_streamparm param;
+    memset(&param, 0, sizeof(param));
+    param.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    param.parm.capture.timeperframe.numerator = 1;
+    param.parm.capture.timeperframe.denominator = fps;  
+	if (-1 == xioctl(fd, VIDIOC_S_PARM, &param)){
+		perror("unable to change device parameters");
+		return ;
+	}
+
+	if(param.parm.capture.timeperframe.numerator){
+		double fps_new = param.parm.capture.timeperframe.denominator
+	                 / param.parm.capture.timeperframe.numerator;
+		if ((double)fps != fps_new) {
+			printf("unsupported frame rate [%d,%f]\n", fps, fps_new);
+			return;
+		}else{
+			printf("new fps:%u , %u/%u\n",fps, param.parm.capture.timeperframe.denominator,
+			param.parm.capture.timeperframe.numerator);
+		}
+	}
+}
+
+uint32_t GetFPSParam(int fd, double fps, struct v4l2_frmivalenum *pfrmival)
+{
+    struct v4l2_frmivalenum frmival[10];
+    float fpss[10];
+    int i=0;
+/*
+    memset(&frmival,0,sizeof(frmival));
+    frmival.pixel_format = fmt;
+    frmival.width = width;
+    frmival.height = height;*/
+    memset(fpss,0,sizeof(fpss));
+    while(pfrmival->index < 10){
+	    if (-1 == xioctl(fd, VIDIOC_ENUM_FRAMEINTERVALS, pfrmival)){
+		    perror("getting VIDIOC_ENUM_FRAMEINTERVALS");
+		    break;
+		}
+		frmival[pfrmival->index] = *pfrmival;
+        if (pfrmival->type == V4L2_FRMIVAL_TYPE_DISCRETE){
+	    	double f;
+        	f = (double)pfrmival->discrete.denominator/pfrmival->discrete.numerator;
+        	printf("[%u/%u]\n", pfrmival->discrete.denominator, 
+        						pfrmival->discrete.numerator);
+            printf("[%dx%d] %f fps\n", pfrmival->width, pfrmival->height,f);
+            
+			fpss[pfrmival->index]=f;
+			frmival[pfrmival->index]=*pfrmival;
+        }else{
+        	double f1,f2;
+        	f1 = (double)pfrmival->stepwise.max.denominator/pfrmival->stepwise.max.numerator;
+        	f2 = (double)pfrmival->stepwise.min.denominator/pfrmival->stepwise.min.numerator;
+            printf("[%dx%d] [%f,%f] fps\n", pfrmival->width, pfrmival->height,f1,f2);
+       	}
+       	printf("idx=%d\n", pfrmival->index);
+       	pfrmival->index++;
+    }
+    /* list is in increasing order */
+    if(pfrmival->index){
+    	i = pfrmival->index;
+	    while(--i >= 0){
+    		if(fps <= fpss[i] ){
+    			break;
+    		}
+    	}
+    	*pfrmival = frmival[i];
+    	printf("found[%f,%f]\n", fps, fpss[i]);
+    }
+    return (uint32_t)fpss[i];
+}
+
+int PrintFrameInterval(int fd, unsigned int fmt, unsigned int width, unsigned int height)
+{
+    struct v4l2_frmivalenum frmival;
+    memset(&frmival,0,sizeof(frmival));
+    frmival.pixel_format = fmt;
+    frmival.width = width;
+    frmival.height = height;
+    while(1){
+	    if (-1 == xioctl(fd, VIDIOC_ENUM_FRAMEINTERVALS, &frmival)){
+		    perror("getting VIDIOC_ENUM_FRAMEINTERVALS");
+		    return -1;
+		}
+
+        if (frmival.type == V4L2_FRMIVAL_TYPE_DISCRETE){
+           	printf("[%u/%u]\n", frmival.discrete.denominator, 
+        						frmival.discrete.numerator);
+            printf("[%dx%d] %f fps\n", width, height,
+            1.0*frmival.discrete.denominator/frmival.discrete.numerator);
+		}else
+            printf("[%dx%d] [%f,%f] fps\n", width, height,
+            1.0*frmival.stepwise.max.denominator/frmival.stepwise.max.numerator,
+            1.0*frmival.stepwise.min.denominator/frmival.stepwise.min.numerator);
+        frmival.index++;
+    }
+    return 0;
+}
+
+int EnumFrameRate(int fd, unsigned int format)
+{
+    unsigned int width=0, height=0;;
+    struct v4l2_frmsizeenum frmsize;
+    memset(&frmsize,0,sizeof(frmsize));
+    frmsize.pixel_format = format; //V4L2_PIX_FMT_JPEG;
+	printf("\nEnumFrameRate:\n");
+    while(1){
+	    if (-1 == xioctl(fd, VIDIOC_ENUM_FRAMESIZES, &frmsize)){
+		    perror("getting VIDIOC_ENUM_FRAMESIZES");
+		    return -1;
+		}
+		printf("frmsize.type=%d\n", frmsize.type);
+        if (frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){
+            PrintFrameInterval(fd, frmsize.pixel_format, frmsize.discrete.width, 
+            frmsize.discrete.height);
+        }else{
+            for (width=frmsize.stepwise.min_width; width< frmsize.stepwise.max_width; 
+            	width+=frmsize.stepwise.step_width)
+                for (height=frmsize.stepwise.min_height; 
+                	height< frmsize.stepwise.max_height; 
+                	height+=frmsize.stepwise.step_height)
+                    PrintFrameInterval(fd, frmsize.pixel_format, width, height);
+        }
+        frmsize.index++;
+    }
+    return 0;
+}
+
 int print_caps(int fd)
 {
     struct v4l2_capability caps = {0};
@@ -510,7 +678,7 @@ int print_caps(int fd)
         cropcap.defrect.width, cropcap.defrect.height, cropcap.defrect.left, cropcap.defrect.top,
         cropcap.pixelaspect.numerator, cropcap.pixelaspect.denominator);
 	}
-    EnumVideoFMT(fd); 
+    EnumVideoFMT(fd);
     //int support_grbg10 = 0;
     /*
     if (!support_grbg10)
@@ -523,7 +691,6 @@ int print_caps(int fd)
 
     return 0;
 }
-
 
 int init_mmap(int fd)
 {
@@ -555,7 +722,7 @@ int init_mmap(int fd)
     return 0;
 }
 
-int capture_image(int fd)
+int capture_image(int fd, char* windowname)
 {
     struct v4l2_buffer buf = {0};
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -590,15 +757,15 @@ int capture_image(int fd)
         perror("Retrieving Frame");
         return 1;
     }
-    printf ("saving image\n");
+    printf ("show image\n");
 
     IplImage* frame;
     CvMat cvmat = cvMat(480, 640, CV_8UC3, (void*)buffer);
     frame = cvDecodeImage(&cvmat, 1);
-    cvNamedWindow("window",CV_WINDOW_AUTOSIZE);
-    cvShowImage("window", frame);
-    cvWaitKey(0);
-    cvSaveImage("image.jpg", frame, 0);
+//    cvNamedWindow("window",CV_WINDOW_AUTOSIZE);
+    cvShowImage(windowname, frame);
+//    cvWaitKey(0);
+//    cvSaveImage("image.jpg", frame, 0);
 
     return 0;
 }
