@@ -17,11 +17,27 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
+#message("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
+#$ENV{VAR} to get shell env
+set(V4L2_LIB_DIR $ENV{V4L2_LIB_DIR})
+set(V4L2_LIB_OUT $ENV{V4L2_LIB_OUT} )
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${V4L2_LIB_OUT})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${V4L2_LIB_OUT})
+
+message("V4L2_LIB_OUT is ${V4L2_LIB_OUT}")
+
+#    set_target_properties( v4l2-lib
+#    PROPERTIES
+#    ARCHIVE_OUTPUT_DIRECTORY "${V4L2_LIB_OUT}"
+#    LIBRARY_OUTPUT_DIRECTORY "${V4L2_LIB_OUT}"
+#    RUNTIME_OUTPUT_DIRECTORY "${V4L2_LIB_OUT}"
+#)
+
 #build a static lib
 ADD_LIBRARY(v4l2-lib STATIC
 	Webcam.cpp
 	CameraFrame.cpp
-	capture-v4l2.c 
+	capture-v4l2.c
 	)
 
 #dynamic or static link to dependent openCV libs
