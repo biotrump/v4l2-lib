@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-PROJECT( v4l2-lib )
+PROJECT( v4l2 )
 
 #There are three kinds of target files that may be built: archive, library, and runtime.
 #Executables are always treated as runtime targets.
@@ -11,16 +11,16 @@ PROJECT( v4l2-lib )
 #All Windows-based systems including Cygwin are DLL platforms.
 #This property is initialized by the value of the variable CMAKE_RUNTIME_OUTPUT_DIRECTORY
 #if it is set when a target is created.
-#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${V4L2_LIB_OUT})
-#set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${V4L2_LIB_OUT})
-#set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${V4L2_LIB_OUT})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${v4l2_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${v4l2_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${v4l2_BINARY_DIR}/lib)
 
 #build a static lib
-ADD_LIBRARY(v4l2-lib STATIC
+ADD_LIBRARY(v4l2 STATIC
 	Webcam.cpp
 	CameraFrame.cpp
 	capture-v4l2.c
 	)
 
 #dynamic or static link to dependent openCV libs
-TARGET_LINK_LIBRARIES( v4l2-lib ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( v4l2 ${OpenCV_LIBS} )

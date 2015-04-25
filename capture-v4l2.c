@@ -11,8 +11,8 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
+//#include <opencv2/core/core.hpp>
+//#include <opencv2/highgui/highgui.hpp>
 
 #define		V4L2_IOCTL_RETRY	(20)
 
@@ -721,7 +721,7 @@ int init_mmap(int fd)
 
     return 0;
 }
-
+#if 0
 int capture_image(int fd, char* windowname)
 {
     struct v4l2_buffer buf = {0};
@@ -771,7 +771,6 @@ int capture_image(int fd, char* windowname)
 }
 
 
-#if 0
 int main()
 {
         int fd;
