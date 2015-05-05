@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-
+ #include <unistd.h>
 #include <linux/videodev2.h>
 
 static int clamp(double x)

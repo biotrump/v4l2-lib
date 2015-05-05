@@ -15,11 +15,14 @@ message("v4l2-lib_BINARY_DIR : ${v4l2-lib_BINARY_DIR}")
 
 #openMP to avoid link error : omp_xxx error!
 # undefined reference to `GOMP_loop_dynamic_start
-find_package(OpenMP)
-if(OPENMP_FOUND)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-endif()
+if(NOT OPENMP_FOUND)
+#if it's not found in parent project, find it again!
+	find_package(OpenMP)
+	if(OPENMP_FOUND)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+	endif()
+endif(NOT OPENMP_FOUND)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${v4l2-lib_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${v4l2-lib_BINARY_DIR}/lib)
